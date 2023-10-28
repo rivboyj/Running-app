@@ -7,17 +7,34 @@
 
 import SwiftUI
 
+
 struct ContentView: View {
+    @State private var selectedTab = 0
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView(selection: $selectedTab) {
+            FirstView()
+                .tabItem {
+                    Label("Goals", systemImage: "globe")
+                }
+                .tag(0)
+            
+            SecondView()
+                .tabItem {
+                    Label("History", systemImage: "star")
+                }
+                .tag(1)
         }
-        .padding()
     }
 }
+
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
+}
+
 
 #Preview {
     ContentView()
