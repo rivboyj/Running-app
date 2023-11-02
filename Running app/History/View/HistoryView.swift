@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct SecondView: View {
+struct HistoryView: View {
     var body: some View {
         Text("Second View")
     }
