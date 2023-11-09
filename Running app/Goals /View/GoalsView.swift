@@ -14,36 +14,77 @@ struct GoalsView: View {
     
     var body: some View {
         NavigationView {
-            GeometryReader { geometry in
-                HStack(spacing: 10) {
-                    NavigationLink(destination: DurationGoalView(viewModel: viewModel)) {
-                        buttonContent(title: "Duration", imageName: "clock")
-                            .frame(width: geometry.size.width / 5 - 10)
+            VStack {
+                List {
+                    ForEach(viewModel.goalsArr) { goal in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(goal.goalName).font(.headline)
+                                HStack {
+                                    if goal.distanceInMiles > 0 {
+                                        Text("Distance: \(goal.distanceInMiles, specifier: "%.2f") miles")
+                                    }
+                                    if goal.pacePerMile.hours > 0 || goal.pacePerMile.minutes > 0 || goal.pacePerMile.seconds > 0 {
+                                        Text("Pace: \(goal.pacePerMile.hours)h \(goal.pacePerMile.minutes)m \(goal.pacePerMile.seconds)s per mile")
+                                    }
+                                    if goal.duration.hours > 0 || goal.duration.minutes > 0 || goal.duration.seconds > 0 {
+                                        Text("Duration: \(goal.duration.hours)h \(goal.duration.minutes)m \(goal.duration.seconds)s")
+                                    }
+                                }
+                            }
+                            Spacer()
+                            Button(action: {
+                                if let index = viewModel.goalsArr.firstIndex(where: { $0.id == goal.id }) {
+                                    viewModel.goalsArr.remove(at: index)
+                                }
+                            }) {
+                                Image(systemName: "xmark.circle")
+                                    .foregroundColor(.red)
+                            }
+                        }
                     }
-                    
-                    NavigationLink(destination: MileGoalView(viewModel: viewModel)) {
-                        buttonContent(title: "Mile", imageName: "trophy")
-                            .frame(width: geometry.size.width / 5 - 10)
-                    }
-                    
-                    NavigationLink(destination: DistanceGoalView(viewModel: viewModel)) {
-                        buttonContent(title: "Distance", imageName: "distance")
-                            .frame(width: geometry.size.width / 5 - 10)
-                    }
-                    
-                    NavigationLink(destination: SprintGoalView(viewModel: viewModel)) {
-                        buttonContent(title: "Sprint", imageName: "speed")
-                            .frame(width: geometry.size.width / 5 - 10)
-                    }
-                    
-                    NavigationLink(destination: CustomGoalView(viewModel: viewModel)) {
-                        buttonContent(title: "Custom", imageName: "gears")
-                            .frame(width: geometry.size.width / 5 - 10)
-                    }
+                    .onDelete(perform: deleteGoal)
                 }
-                .offset(y: 600) // Adjust as per your needs
+                
+                Spacer()
+
+                GeometryReader { geometry in
+                    HStack(spacing: 10) {
+                        NavigationLink(destination: DurationGoalView(viewModel: viewModel)) {
+                            buttonContent(title: "Duration", imageName: "clock")
+                                .frame(width: geometry.size.width / 5 - 10)
+                        }
+                        
+                        NavigationLink(destination: MileGoalView(viewModel: viewModel)) {
+                            buttonContent(title: "Mile", imageName: "trophy")
+                                .frame(width: geometry.size.width / 5 - 10)
+                        }
+                        
+                        NavigationLink(destination: DistanceGoalView(viewModel: viewModel)) {
+                            buttonContent(title: "Distance", imageName: "distance")
+                                .frame(width: geometry.size.width / 5 - 10)
+                        }
+                        
+                        NavigationLink(destination: SprintGoalView(viewModel: viewModel)) {
+                            buttonContent(title: "Sprint", imageName: "speed")
+                                .frame(width: geometry.size.width / 5 - 10)
+                        }
+                        
+                        NavigationLink(destination: CustomGoalView(viewModel: viewModel)) {
+                            buttonContent(title: "Custom", imageName: "gears")
+                                .frame(width: geometry.size.width / 5 - 10)
+                        }
+                    }
+                    .offset(y: geometry.size.height / 2)
+                }
             }
+            .navigationBarTitle("Goals", displayMode: .large)
+            .navigationBarHidden(false)
         }
+    }
+    
+    func deleteGoal(at offsets: IndexSet) {
+        viewModel.goalsArr.remove(atOffsets: offsets)
     }
     
     func buttonContent(title: String, imageName: String? = nil) -> some View {
@@ -51,96 +92,99 @@ struct GoalsView: View {
             ZStack {
                 Circle()
                     .foregroundColor(Color.blue)
-                    .frame(width: 60, height: 60) // Adjust the size as needed
-                if let image = imageName {
-                    Image(image)
+                    .frame(width: 60, height: 60)
+                if let imageName = imageName, let image = UIImage(named: imageName) {
+                    Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 30, height: 30) // Adjust size accordingly
+                        .frame(width: 30, height: 30)
                 } else {
-                    Text(title)
+                    Text(title.prefix(1))
                         .foregroundColor(Color.white)
+                        .font(.title)
                 }
             }
             Text(title)
-                .font(.system(size: 12)) // Adjust the font size as needed
+                .font(.system(size: 12))
         }
     }
 }
-
 struct DurationGoalView: View {
     @ObservedObject var viewModel: GoalViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
     @State private var goalName: String = ""
     @State private var hours: Int = 0
     @State private var minutes: Int = 0
-    @State private var seconds: Int = 0
 
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            
-            Picker("Hours", selection: $hours) {
-                ForEach(0..<24) { hour in
-                    Text("\(hour) hr")
+            HStack {
+                Picker("Hours", selection: $hours) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text("\(hour) hour\(hour == 1 ? "" : "s")").tag(hour)
+                    }
                 }
-            }
-
-            Picker("Minutes", selection: $minutes) {
-                ForEach(0..<60) { minute in
-                    Text("\(minute) min")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Minutes", selection: $minutes) {
+                    ForEach(0..<60, id: \.self) { minute in
+                        Text("\(minute) min").tag(minute)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-
-            Picker("Seconds", selection: $seconds) {
-                ForEach(0..<60) { second in
-                    Text("\(second) sec")
-                }
-            }
-
+            .compositingGroup()
+            .frame(height: 150)
             Button("Submit") {
-                let time = Time(hours: hours, minutes: minutes, seconds: seconds)
-                let goal = Goal(goalName: goalName, distanceInMiles: 0, pacePerMile: Time(hours: 0, minutes: 0, seconds: 0), duration: time)
+                let durationTime = Time(hours: hours, minutes: minutes, seconds: 0)
+                let goal = Goal(goalName: goalName, distanceInMiles: 0, pacePerMile: Time(hours: 0, minutes: 0, seconds: 0), duration: durationTime)
                 viewModel.goalsArr.append(goal)
+                self.presentationMode.wrappedValue.dismiss()
             }
         }
     }
 }
 
+// MileGoalView with 'presentationMode' to dismiss the view
 struct MileGoalView: View {
     @ObservedObject var viewModel: GoalViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
     @State private var goalName: String = ""
     @State private var paceHours: Int = 0
     @State private var paceMinutes: Int = 0
-    @State private var paceSeconds: Int = 0
 
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            
-            Picker("Hours", selection: $paceHours) {
-                ForEach(0..<24) { hour in
-                    Text("\(hour) hr")
+            HStack {
+                Picker("Hours", selection: $paceHours) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text("\(hour) hr").tag(hour)
+                    }
                 }
-            }
-
-            Picker("Minutes", selection: $paceMinutes) {
-                ForEach(0..<60) { minute in
-                    Text("\(minute) min")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Minutes", selection: $paceMinutes) {
+                    ForEach(0..<60, id: \.self) { minute in
+                        Text("\(minute) min").tag(minute)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-
-            Picker("Seconds", selection: $paceSeconds) {
-                ForEach(0..<60) { second in
-                    Text("\(second) sec")
-                }
-            }
-
+            .compositingGroup()
+            .frame(height: 150)
             Button("Submit") {
-                let pace = Time(hours: paceHours, minutes: paceMinutes, seconds: paceSeconds)
+                let pace = Time(hours: paceHours, minutes: paceMinutes, seconds: 0)
                 let goal = Goal(goalName: goalName, distanceInMiles: 0, pacePerMile: pace, duration: Time(hours: 0, minutes: 0, seconds: 0))
                 viewModel.goalsArr.append(goal)
+                self.presentationMode.wrappedValue.dismiss()
             }
         }
     }
@@ -149,141 +193,177 @@ struct MileGoalView: View {
 
 struct DistanceGoalView: View {
     @ObservedObject var viewModel: GoalViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
     @State private var goalName: String = ""
-    @State private var distance: Double = 0.0
+    @State private var miles: Int = 0
+    @State private var fraction: Double = 0.0
 
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            
-            Picker("Distance in Miles", selection: $distance) {
-                ForEach(0..<101) { mile in
-                    Text("\(mile) mi")
+            HStack {
+                Picker("Miles", selection: $miles) {
+                    ForEach(0..<101, id: \.self) { mile in
+                        Text("\(mile) mi").tag(mile)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Fraction", selection: $fraction) {
+                    ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
+                        Text("\(frac, specifier: "%.1f") mi").tag(frac)
+                    }
+                }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-
             Button("Submit") {
-                let goal = Goal(goalName: goalName, distanceInMiles: distance, pacePerMile: Time(hours: 0, minutes: 0, seconds: 0), duration: Time(hours: 0, minutes: 0, seconds: 0))
+                let totalDistance = Double(miles) + fraction
+                let goal = Goal(goalName: goalName, distanceInMiles: totalDistance, pacePerMile: Time(hours: 0, minutes: 0, seconds: 0), duration: Time(hours: 0, minutes: 0, seconds: 0))
                 viewModel.goalsArr.append(goal)
+                self.presentationMode.wrappedValue.dismiss()
             }
         }
     }
 }
 
-
+// SprintGoalView with 'presentationMode' to dismiss the view
 struct SprintGoalView: View {
     @ObservedObject var viewModel: GoalViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
     @State private var goalName: String = ""
-    @State private var distance: Double = 0.0
+    @State private var miles: Int = 0
+    @State private var fraction: Double = 0.0
     @State private var paceHours: Int = 0
     @State private var paceMinutes: Int = 0
-    @State private var paceSeconds: Int = 0
 
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            
-            Picker("Distance in Miles", selection: $distance) {
-                ForEach(0..<101) { mile in
-                    Text("\(mile) mi")
+            HStack {
+                Picker("Miles", selection: $miles) {
+                    ForEach(0..<101, id: \.self) { mile in
+                        Text("\(mile) mi").tag(mile)
+                    }
                 }
-            }
-            
-            Picker("Hours", selection: $paceHours) {
-                ForEach(0..<24) { hour in
-                    Text("\(hour) hr")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Fraction", selection: $fraction) {
+                    ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
+                        Text("\(frac, specifier: "%.1f")").tag(frac)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-
-            Picker("Minutes", selection: $paceMinutes) {
-                ForEach(0..<60) { minute in
-                    Text("\(minute) min")
+            HStack {
+                Picker("Pace Hours", selection: $paceHours) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text("\(hour) hr").tag(hour)
+                    }
                 }
-            }
-
-            Picker("Seconds", selection: $paceSeconds) {
-                ForEach(0..<60) { second in
-                    Text("\(second) sec")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Pace Minutes", selection: $paceMinutes) {
+                    ForEach(0..<60, id: \.self) { minute in
+                        Text("\(minute) min").tag(minute)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-
             Button("Submit") {
-                let pace = Time(hours: paceHours, minutes: paceMinutes, seconds: paceSeconds)
-                let goal = Goal(goalName: goalName, distanceInMiles: distance, pacePerMile: pace, duration: Time(hours: 0, minutes: 0, seconds: 0))
+                let totalDistance = Double(miles) + fraction
+                let paceTime = Time(hours: paceHours, minutes: paceMinutes, seconds: 0)
+                let goal = Goal(goalName: goalName, distanceInMiles: totalDistance, pacePerMile: paceTime, duration: Time(hours: 0, minutes: 0, seconds: 0))
                 viewModel.goalsArr.append(goal)
+                self.presentationMode.wrappedValue.dismiss()
             }
         }
     }
 }
-
 
 struct CustomGoalView: View {
     @ObservedObject var viewModel: GoalViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
     @State private var goalName: String = ""
-    @State private var distance: Double = 0.0
+    @State private var miles: Int = 0
+    @State private var fraction: Double = 0.0
     @State private var paceHours: Int = 0
     @State private var paceMinutes: Int = 0
-    @State private var paceSeconds: Int = 0
     @State private var durationHours: Int = 0
     @State private var durationMinutes: Int = 0
-    @State private var durationSeconds: Int = 0
 
-    init(viewModel: GoalViewModel) {
-        self.viewModel = viewModel
-    }
-    
     var body: some View {
         Form {
-            // Goal Name
             TextField("Goal Name", text: $goalName)
-            
-            // Distance in Miles
-            Stepper(value: $distance, in: 0...100) {
-                Text("Distance: \(distance, specifier: "%.1f") miles")
-            }
-            
-            // Pace Per Mile
-            Picker("Pace Hours", selection: $paceHours) {
-                ForEach(0..<24) { hour in
-                    Text("\(hour) hr")
+            HStack {
+                Picker("Miles", selection: $miles) {
+                    ForEach(0..<101, id: \.self) { mile in
+                        Text("\(mile) mi").tag(mile)
+                    }
                 }
-            }
-            Picker("Pace Minutes", selection: $paceMinutes) {
-                ForEach(0..<60) { minute in
-                    Text("\(minute) min")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Fraction", selection: $fraction) {
+                    ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
+                        Text("\(frac, specifier: "%.1f")").tag(frac)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-            Picker("Pace Seconds", selection: $paceSeconds) {
-                ForEach(0..<60) { second in
-                    Text("\(second) sec")
+            HStack {
+                Picker("Pace Hours", selection: $paceHours) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text("\(hour) hr").tag(hour)
+                    }
                 }
-            }
-            
-            // Duration
-            Picker("Duration Hours", selection: $durationHours) {
-                ForEach(0..<24) { hour in
-                    Text("\(hour) hr")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Pace Minutes", selection: $paceMinutes) {
+                    ForEach(0..<60, id: \.self) { minute in
+                        Text("\(minute) min").tag(minute)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-            Picker("Duration Minutes", selection: $durationMinutes) {
-                ForEach(0..<60) { minute in
-                    Text("\(minute) min")
+            HStack {
+                Picker("Duration Hours", selection: $durationHours) {
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text("\(hour) hr").tag(hour)
+                    }
                 }
-            }
-            Picker("Duration Seconds", selection: $durationSeconds) {
-                ForEach(0..<60) { second in
-                    Text("\(second) sec")
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
+                Picker("Duration Minutes", selection: $durationMinutes) {
+                    ForEach(0..<60, id: \.self) { minute in
+                        Text("\(minute) min").tag(minute)
+                    }
                 }
+                .pickerStyle(WheelPickerStyle())
+                .frame(width: 100, height: 150)
+                .clipped()
             }
-            
             Button("Submit") {
-                let paceTime = Time(hours: paceHours, minutes: paceMinutes, seconds: paceSeconds)
-                let durationTime = Time(hours: durationHours, minutes: durationMinutes, seconds: durationSeconds)
-                let goal = Goal(goalName: goalName, distanceInMiles: distance, pacePerMile: paceTime, duration: durationTime)
+                let totalDistance = Double(miles) + fraction
+                let paceTime = Time(hours: paceHours, minutes: paceMinutes, seconds: 0)
+                let durationTime = Time(hours: durationHours, minutes: durationMinutes, seconds: 0)
+                let goal = Goal(goalName: goalName, distanceInMiles: totalDistance, pacePerMile: paceTime, duration: durationTime)
                 viewModel.goalsArr.append(goal)
+                self.presentationMode.wrappedValue.dismiss()
             }
         }
     }

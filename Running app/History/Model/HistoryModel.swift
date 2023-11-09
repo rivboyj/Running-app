@@ -1,14 +1,14 @@
 //
-//  goalModel.swift
+//  HistoryModel.swift
 //  Running app
 //
-//  Created by River on 11/1/23.
+//  Created by River on 11/9/23.
 //
 
 import Foundation
-import SwiftUI
 
-struct Time {
+
+struct Time2 {
     let hours: Int
     let minutes: Int
     let seconds: Int
@@ -20,10 +20,13 @@ struct Time {
     }
 }
 
-struct Goal: Identifiable {
+struct CompletedGoal: Identifiable {
     let id = UUID()
     let goalName: String
     let distanceInMiles: Double
-    let pacePerMile: Time
-    let duration: Time
+    let pacePerMile: Time2
+    let duration: Time2
 }
+
+
+
