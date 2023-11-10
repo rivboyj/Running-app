@@ -7,13 +7,14 @@
 
 import SwiftUI
 
-
 struct ContentView: View {
     @State private var selectedTab = 1
+    // Create a shared instance of HistoryViewModel if it's supposed to be shared across views.
+    let historyViewModel = HistoryViewModel()
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            GoalsView()
+            GoalsView(viewModel: GoalViewModel(), historyViewModel: historyViewModel)
                 .tabItem {
                     Label("Goals", systemImage: "target")
                 }
@@ -25,7 +26,7 @@ struct ContentView: View {
                 }
                 .tag(1)
             
-            HistoryView()
+            HistoryView(historyViewModel: historyViewModel)
                 .tabItem {
                     Label("History", systemImage: "clock")
                 }
@@ -33,7 +34,6 @@ struct ContentView: View {
         }
     }
 }
-
 struct HomeView: View {
     // Assuming 'streak' is a state variable for demonstration purposes.
     // You would update this variable based on user input or app logic elsewhere.

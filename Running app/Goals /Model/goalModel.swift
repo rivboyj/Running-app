@@ -20,10 +20,17 @@ struct Time {
     }
 }
 
-struct Goal: Identifiable {
-    let id = UUID()
-    let goalName: String
-    let distanceInMiles: Double
-    let pacePerMile: Time
-    let duration: Time
+struct Goal: Identifiable, Equatable {
+    var id = UUID()
+    var goalName: String
+    var distanceInMiles: Double
+    var pacePerMile: Time
+    var duration: Time
+}
+
+// Ensure that 'Goal' conforms to 'Equatable'
+extension Goal {
+    static func == (lhs: Goal, rhs: Goal) -> Bool {
+        return lhs.id == rhs.id
+    }
 }

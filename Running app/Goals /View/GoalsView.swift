@@ -11,7 +11,11 @@ import SwiftUI
 
 struct GoalsView: View {
     @ObservedObject var viewModel = GoalViewModel()
-    
+    @ObservedObject var historyViewModel = HistoryViewModel()
+    @State private var showingDeleteAlert = false
+    @State private var showingCompleteAlert = false
+    @State private var activeGoal: Goal?
+
     var body: some View {
         NavigationView {
             VStack {
@@ -34,79 +38,106 @@ struct GoalsView: View {
                             }
                             Spacer()
                             Button(action: {
-                                if let index = viewModel.goalsArr.firstIndex(where: { $0.id == goal.id }) {
-                                    viewModel.goalsArr.remove(at: index)
-                                }
+                                self.activeGoal = goal
+                                self.showingDeleteAlert = true
                             }) {
                                 Image(systemName: "xmark.circle")
                                     .foregroundColor(.red)
+                            }
+                            Button(action: {
+                                self.activeGoal = goal
+                                self.showingCompleteAlert = true
+                            }) {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundColor(.green)
                             }
                         }
                     }
                     .onDelete(perform: deleteGoal)
                 }
-                
-                Spacer()
-
-                GeometryReader { geometry in
-                    HStack(spacing: 10) {
-                        NavigationLink(destination: DurationGoalView(viewModel: viewModel)) {
-                            buttonContent(title: "Duration", imageName: "clock")
-                                .frame(width: geometry.size.width / 5 - 10)
+                .alert(isPresented: $showingDeleteAlert) {
+                    Alert(
+                        title: Text("Delete Goal"),
+                        message: Text("Are you sure you want to delete this goal?"),
+                        primaryButton: .destructive(Text("Delete"), action: {
+                            if let goal = activeGoal, let index = viewModel.goalsArr.firstIndex(where: { $0.id == goal.id }) {
+                                viewModel.goalsArr.remove(at: index)
+                            }
+                            activeGoal = nil
+                            showingDeleteAlert = false
+                        }),
+                        secondaryButton: .cancel {
+                            activeGoal = nil
+                            showingDeleteAlert = false
                         }
-                        
-                        NavigationLink(destination: MileGoalView(viewModel: viewModel)) {
-                            buttonContent(title: "Mile", imageName: "trophy")
-                                .frame(width: geometry.size.width / 5 - 10)
-                        }
-                        
-                        NavigationLink(destination: DistanceGoalView(viewModel: viewModel)) {
-                            buttonContent(title: "Distance", imageName: "distance")
-                                .frame(width: geometry.size.width / 5 - 10)
-                        }
-                        
-                        NavigationLink(destination: SprintGoalView(viewModel: viewModel)) {
-                            buttonContent(title: "Sprint", imageName: "speed")
-                                .frame(width: geometry.size.width / 5 - 10)
-                        }
-                        
-                        NavigationLink(destination: CustomGoalView(viewModel: viewModel)) {
-                            buttonContent(title: "Custom", imageName: "gears")
-                                .frame(width: geometry.size.width / 5 - 10)
-                        }
-                    }
-                    .offset(y: geometry.size.height / 2)
+                    )
                 }
+                .alert(isPresented: $showingCompleteAlert) {
+                    Alert(
+                        title: Text("Completeeee Goal"),
+                        message: Text("Are you sure you want to mark this goal as complete?"),
+                        primaryButton: .default(Text("Complete"), action: {
+                            if let goal = activeGoal {
+                                historyViewModel.addCompletedGoal(from: goal)
+                                if let index = viewModel.goalsArr.firstIndex(where: { $0.id == goal.id }) {
+                                    viewModel.goalsArr.remove(at: index)
+                                }
+                            }
+                            activeGoal = nil
+                            showingCompleteAlert = false
+                        }),
+                        secondaryButton: .cancel {
+                            activeGoal = nil
+                            showingCompleteAlert = false
+                        }
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    NavigationLink(destination: DurationGoalView(viewModel: viewModel)) {
+                        buttonContent(title: "Duration", imageName: "clock")
+                    }
+                    NavigationLink(destination: MileGoalView(viewModel: viewModel)) {
+                        buttonContent(title: "Mile", imageName: "trophy")
+                    }
+                    NavigationLink(destination: DistanceGoalView(viewModel: viewModel)) {
+                        buttonContent(title: "Distance", imageName: "map")
+                    }
+                    NavigationLink(destination: SprintGoalView(viewModel: viewModel)) {
+                        buttonContent(title: "Sprint", imageName: "hare")
+                    }
+                    NavigationLink(destination: CustomGoalView(viewModel: viewModel)) {
+                        buttonContent(title: "Custom", imageName: "slider.horizontal.3")
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(UIColor.systemGroupedBackground))
+
             }
             .navigationBarTitle("Goals", displayMode: .large)
-            .navigationBarHidden(false)
         }
     }
-    
-    func deleteGoal(at offsets: IndexSet) {
+
+    private func deleteGoal(at offsets: IndexSet) {
         viewModel.goalsArr.remove(atOffsets: offsets)
     }
-    
-    func buttonContent(title: String, imageName: String? = nil) -> some View {
+
+    private func buttonContent(title: String, imageName: String) -> some View {
         VStack {
-            ZStack {
-                Circle()
-                    .foregroundColor(Color.blue)
-                    .frame(width: 60, height: 60)
-                if let imageName = imageName, let image = UIImage(named: imageName) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 30, height: 30)
-                } else {
-                    Text(title.prefix(1))
-                        .foregroundColor(Color.white)
-                        .font(.title)
-                }
-            }
+            Image(systemName: imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .padding(8)
+                .background(Circle().fill(Color.blue))
+                .foregroundColor(.white)
             Text(title)
                 .font(.system(size: 12))
+                .foregroundColor(.black)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 }
 struct DurationGoalView: View {

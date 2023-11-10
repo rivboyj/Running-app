@@ -10,4 +10,11 @@ import SwiftUI
 
 class HistoryViewModel: ObservableObject {
     @Published var completedGoals: [CompletedGoal] = []
+
+    func addCompletedGoal(from goal: Goal) {
+        let completed = CompletedGoal(goalName: goal.goalName, distanceInMiles: goal.distanceInMiles, pacePerMile: goal.pacePerMile, duration: goal.duration)
+        completedGoals.append(completed)
+    }
 }
+
+
