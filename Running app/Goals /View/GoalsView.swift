@@ -9,11 +9,15 @@ import Foundation
 import SwiftUI
 
 
+enum ActiveAlert {
+    case delete, complete, none
+}
+
 struct GoalsView: View {
     @ObservedObject var viewModel = GoalViewModel()
     @ObservedObject var historyViewModel = HistoryViewModel()
-    @State private var showingDeleteAlert = false
-    @State private var showingCompleteAlert = false
+    @State private var showAlert = false
+    @State private var activeAlert: ActiveAlert = .none
     @State private var activeGoal: Goal?
 
     var body: some View {
@@ -39,14 +43,16 @@ struct GoalsView: View {
                             Spacer()
                             Button(action: {
                                 self.activeGoal = goal
-                                self.showingDeleteAlert = true
+                                self.activeAlert = .complete
+                                self.showAlert = true
                             }) {
                                 Image(systemName: "xmark.circle")
                                     .foregroundColor(.red)
                             }
                             Button(action: {
                                 self.activeGoal = goal
-                                self.showingCompleteAlert = true
+                                self.activeAlert = .delete
+                                self.showAlert = true
                             }) {
                                 Image(systemName: "checkmark.circle")
                                     .foregroundColor(.green)
@@ -55,44 +61,47 @@ struct GoalsView: View {
                     }
                     .onDelete(perform: deleteGoal)
                 }
-                .alert(isPresented: $showingDeleteAlert) {
-                    Alert(
-                        title: Text("Delete Goal"),
-                        message: Text("Are you sure you want to delete this goal?"),
-                        primaryButton: .destructive(Text("Delete"), action: {
-                            if let goal = activeGoal, let index = viewModel.goalsArr.firstIndex(where: { $0.id == goal.id }) {
-                                viewModel.goalsArr.remove(at: index)
-                            }
-                            activeGoal = nil
-                            showingDeleteAlert = false
-                        }),
-                        secondaryButton: .cancel {
-                            activeGoal = nil
-                            showingDeleteAlert = false
-                        }
-                    )
-                }
-                .alert(isPresented: $showingCompleteAlert) {
-                    Alert(
-                        title: Text("Completeeee Goal"),
-                        message: Text("Are you sure you want to mark this goal as complete?"),
-                        primaryButton: .default(Text("Complete"), action: {
-                            if let goal = activeGoal {
-                                historyViewModel.addCompletedGoal(from: goal)
-                                if let index = viewModel.goalsArr.firstIndex(where: { $0.id == goal.id }) {
+                .alert(isPresented: $showAlert) {
+                    switch activeAlert {
+                    case .delete:
+                        return Alert(
+                            title: Text("Delete Goal"),
+                            message: Text("Are you sure you want to delete this goal?"),
+                            primaryButton: .destructive(Text("Delete"), action: {
+                                if let deleteGoal = activeGoal, let index = viewModel.goalsArr.firstIndex(where: { $0.id == deleteGoal.id }) {
                                     viewModel.goalsArr.remove(at: index)
                                 }
+                                activeGoal = nil
+                                activeAlert = .none
+                            }),
+                            secondaryButton: .cancel {
+                                activeGoal = nil
+                                activeAlert = .none
                             }
-                            activeGoal = nil
-                            showingCompleteAlert = false
-                        }),
-                        secondaryButton: .cancel {
-                            activeGoal = nil
-                            showingCompleteAlert = false
-                        }
-                    )
+                        )
+                    case .complete:
+                        return Alert(
+                            title: Text("Complete Goal"),
+                            message: Text("Are you sure you want to mark this goal as complete?"),
+                            primaryButton: .default(Text("Complete"), action: {
+                                if let completeGoal = activeGoal {
+                                    historyViewModel.addCompletedGoal(from: completeGoal)
+                                    if let index = viewModel.goalsArr.firstIndex(where: { $0.id == completeGoal.id }) {
+                                        viewModel.goalsArr.remove(at: index)
+                                    }
+                                }
+                                activeGoal = nil
+                                activeAlert = .none
+                            }),
+                            secondaryButton: .cancel {
+                                activeGoal = nil
+                                activeAlert = .none
+                            }
+                        )
+                    case .none:
+                        return Alert(title: Text("No action"))
+                    }
                 }
-
                 HStack(spacing: 10) {
                     NavigationLink(destination: DurationGoalView(viewModel: viewModel)) {
                         buttonContent(title: "Duration", imageName: "clock")
@@ -113,7 +122,6 @@ struct GoalsView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(Color(UIColor.systemGroupedBackground))
-
             }
             .navigationBarTitle("Goals", displayMode: .large)
         }
