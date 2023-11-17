@@ -6,12 +6,12 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct ContentView: View {
     @State private var selectedTab = 1
-    // Create a shared instance of HistoryViewModel if it's supposed to be shared across views.
-    let historyViewModel = HistoryViewModel()
-
+    let mainViewModel = MainViewModel() // Shared instance of MainViewModel
+    let historyViewModel = HistoryViewModel() 
     var body: some View {
         TabView(selection: $selectedTab) {
             GoalsView(viewModel: GoalViewModel(), historyViewModel: historyViewModel)
@@ -20,12 +20,13 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            HomeView()
+            HomeView(mainViewModel: mainViewModel)
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
                 .tag(1)
             
+            // Assuming you have a HistoryView
             HistoryView(historyViewModel: historyViewModel)
                 .tabItem {
                     Label("History", systemImage: "clock")
@@ -34,51 +35,145 @@ struct ContentView: View {
         }
     }
 }
+
 struct HomeView: View {
-    // Assuming 'streak' is a state variable for demonstration purposes.
-    // You would update this variable based on user input or app logic elsewhere.
-    @State private var streak: Int = 0 // Replace with your own logic to determine the current streak.
+    @ObservedObject var mainViewModel: MainViewModel
+    @State private var streak: Int = 0
 
     var body: some View {
-        VStack {
-            HStack {
-                // Streak Counter in the top left inside a circle
-                ZStack {
-                    Circle()
-                        .frame(width: 40, height: 40)
-                        .foregroundColor(.blue)
-                    Text("\(streak)")
-                        .foregroundColor(.white)
-                        .font(.headline)
+        NavigationView {
+            VStack {
+                HStack {
+                    ZStack {
+                        Circle()
+                            .frame(width: 40, height: 40)
+                            .foregroundColor(.blue)
+                        Text("\(streak)")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                    }
+                    .padding(.leading, 20)
+                    Spacer()
                 }
-                .padding(.leading, 20)
-                Spacer()
-            }
-            .padding(.top, 20)
+                .padding(.top, 20)
 
-            Spacer() 
-        }
-        .navigationBarTitle("Home", displayMode: .inline)
-        .navigationBarItems(leading: HStack {
-            ZStack {
-                Circle()
-                    .frame(width: 40, height: 40)
-                    .foregroundColor(.blue)
-                Text("\(streak)")
-                    .foregroundColor(.white)
-                    .font(.headline)
+                NavigationLink(destination: AddRunView(mainViewModel: mainViewModel)) {
+                    Text("Add a Run")
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+                .padding()
+
+                List {
+                    Section(header: Text("Today's Runs")) {
+                        ForEach(mainViewModel.runArr.filter { Calendar.current.isDateInToday($0.date) }) { run in
+                            HStack {
+                                Text(run.goalName)
+                                Spacer()
+                                Button(action: {
+                                    if let index = mainViewModel.runArr.firstIndex(of: run) {
+                                        mainViewModel.runArr.remove(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "xmark.circle")
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        })
+            .navigationBarTitle("Home", displayMode: .inline)
+        }
     }
 }
 
+
+struct AddRunView: View {
+    @ObservedObject var mainViewModel: MainViewModel
+    @Environment(\.presentationMode) var presentationMode
+
+    @State private var goalName: String = ""
+    @State private var hours: Int = 0
+    @State private var minutes: Int = 0
+    @State private var miles: Int = 0
+    @State private var fractionMiles: Double = 0.0
+    @State private var runDate: Date = Date()
+
+    var body: some View {
+        Form {
+            Section(header: Text("Run Details")) {
+                TextField("Run Name", text: $goalName)
+
+                DatePicker("Run Date", selection: $runDate, displayedComponents: .date)
+
+                VStack {
+                    Text("Time").font(.headline)
+                    HStack {
+                        Picker("Hours", selection: $hours) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                Text("\(hour) hr")
+                            }
+                        }
+                        .pickerStyle(WheelPickerStyle())
+                        .frame(width: 100, height: 150)
+                        .clipped()
+
+                        Picker("Minutes", selection: $minutes) {
+                            ForEach(0..<60, id: \.self) { minute in
+                                Text("\(minute) min")
+                            }
+                        }
+                        .pickerStyle(WheelPickerStyle())
+                        .frame(width: 100, height: 150)
+                        .clipped()
+                    }
+                }
+
+                VStack {
+                    Text("Distance").font(.headline)
+                    HStack {
+                        Picker("Miles", selection: $miles) {
+                            ForEach(0..<101, id: \.self) { mile in
+                                Text("\(mile) mi")
+                            }
+                        }
+                        .pickerStyle(WheelPickerStyle())
+                        .frame(width: 100, height: 150)
+                        .clipped()
+
+                        Picker("Fraction", selection: $fractionMiles) {
+                            ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
+                                Text("\(frac, specifier: "%.1f") mi")
+                            }
+                        }
+                        .pickerStyle(WheelPickerStyle())
+                        .frame(width: 100, height: 150)
+                        .clipped()
+                    }
+                }
+            }
+
+            Button("Add Run") {
+                let totalDistance = Double(miles) + fractionMiles
+                let newRun = Run(
+                    goalName: goalName,
+                    distanceInMiles: totalDistance,
+                    pacePerMile: Time(hours: 0, minutes: 0, seconds: 0),
+                    duration: Time(hours: hours, minutes: minutes, seconds: 0),
+                    date: runDate
+                )
+                mainViewModel.runArr.append(newRun)
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+    }
+}
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
     }
-}
-
-
-#Preview {
-    ContentView()
 }

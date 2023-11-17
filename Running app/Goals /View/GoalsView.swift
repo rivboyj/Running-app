@@ -23,43 +23,20 @@ struct GoalsView: View {
     var body: some View {
         NavigationView {
             VStack {
-                List {
-                    ForEach(viewModel.goalsArr) { goal in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(goal.goalName).font(.headline)
-                                HStack {
-                                    if goal.distanceInMiles > 0 {
-                                        Text("Distance: \(goal.distanceInMiles, specifier: "%.2f") miles")
-                                    }
-                                    if goal.pacePerMile.hours > 0 || goal.pacePerMile.minutes > 0 || goal.pacePerMile.seconds > 0 {
-                                        Text("Pace: \(goal.pacePerMile.hours)h \(goal.pacePerMile.minutes)m \(goal.pacePerMile.seconds)s per mile")
-                                    }
-                                    if goal.duration.hours > 0 || goal.duration.minutes > 0 || goal.duration.seconds > 0 {
-                                        Text("Duration: \(goal.duration.hours)h \(goal.duration.minutes)m \(goal.duration.seconds)s")
-                                    }
-                                }
-                            }
-                            Spacer()
-                            Button(action: {
-                                self.activeGoal = goal
-                                self.activeAlert = .complete
-                                self.showAlert = true
-                            }) {
-                                Image(systemName: "xmark.circle")
-                                    .foregroundColor(.red)
-                            }
-                            Button(action: {
+                ScrollView {
+                    VStack {
+                        ForEach(viewModel.goalsArr) { goal in
+                            GoalRow(goal: goal, deleteAction: {
                                 self.activeGoal = goal
                                 self.activeAlert = .delete
                                 self.showAlert = true
-                            }) {
-                                Image(systemName: "checkmark.circle")
-                                    .foregroundColor(.green)
-                            }
+                            }, completeAction: {
+                                self.activeGoal = goal
+                                self.activeAlert = .complete
+                                self.showAlert = true
+                            })
                         }
                     }
-                    .onDelete(perform: deleteGoal)
                 }
                 .alert(isPresented: $showAlert) {
                     switch activeAlert {
@@ -68,15 +45,15 @@ struct GoalsView: View {
                             title: Text("Delete Goal"),
                             message: Text("Are you sure you want to delete this goal?"),
                             primaryButton: .destructive(Text("Delete"), action: {
-                                if let deleteGoal = activeGoal, let index = viewModel.goalsArr.firstIndex(where: { $0.id == deleteGoal.id }) {
-                                    viewModel.goalsArr.remove(at: index)
+                                if let deleteGoal = self.activeGoal, let index = self.viewModel.goalsArr.firstIndex(where: { $0.id == deleteGoal.id }) {
+                                    self.viewModel.goalsArr.remove(at: index)
                                 }
-                                activeGoal = nil
-                                activeAlert = .none
+                                self.activeGoal = nil
+                                self.activeAlert = .none
                             }),
                             secondaryButton: .cancel {
-                                activeGoal = nil
-                                activeAlert = .none
+                                self.activeGoal = nil
+                                self.activeAlert = .none
                             }
                         )
                     case .complete:
@@ -84,24 +61,27 @@ struct GoalsView: View {
                             title: Text("Complete Goal"),
                             message: Text("Are you sure you want to mark this goal as complete?"),
                             primaryButton: .default(Text("Complete"), action: {
-                                if let completeGoal = activeGoal {
-                                    historyViewModel.addCompletedGoal(from: completeGoal)
-                                    if let index = viewModel.goalsArr.firstIndex(where: { $0.id == completeGoal.id }) {
-                                        viewModel.goalsArr.remove(at: index)
+                                if let completeGoal = self.activeGoal {
+                                    self.historyViewModel.addCompletedGoal(from: completeGoal)
+                                    if let index = self.viewModel.goalsArr.firstIndex(where: { $0.id == completeGoal.id }) {
+                                        self.viewModel.goalsArr.remove(at: index)
                                     }
                                 }
-                                activeGoal = nil
-                                activeAlert = .none
+                                self.activeGoal = nil
+                                self.activeAlert = .none
                             }),
                             secondaryButton: .cancel {
-                                activeGoal = nil
-                                activeAlert = .none
+                                self.activeGoal = nil
+                                self.activeAlert = .none
                             }
                         )
                     case .none:
                         return Alert(title: Text("No action"))
                     }
                 }
+
+                Spacer()
+
                 HStack(spacing: 10) {
                     NavigationLink(destination: DurationGoalView(viewModel: viewModel)) {
                         buttonContent(title: "Duration", imageName: "clock")
@@ -146,6 +126,45 @@ struct GoalsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+}
+
+struct GoalRow: View {
+    let goal: Goal
+    let deleteAction: () -> Void
+    let completeAction: () -> Void
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(goal.goalName).font(.headline)
+                HStack {
+                    if goal.distanceInMiles > 0 {
+                        Text("Distance: \(goal.distanceInMiles, specifier: "%.2f") miles")
+                    }
+                    if goal.pacePerMile.hours > 0 || goal.pacePerMile.minutes > 0 || goal.pacePerMile.seconds > 0 {
+                        Text("Pace: \(goal.pacePerMile.hours)h \(goal.pacePerMile.minutes)m \(goal.pacePerMile.seconds)s per mile")
+                    }
+                    if goal.duration.hours > 0 || goal.duration.minutes > 0 || goal.duration.seconds > 0 {
+                        Text("Duration: \(goal.duration.hours)h \(goal.duration.minutes)m \(goal.duration.seconds)s")
+                    }
+                }
+            }
+            Spacer()
+            Button(action: deleteAction) {
+                Image(systemName: "xmark.circle")
+                    .foregroundColor(.red)
+            }
+            Button(action: completeAction) {
+                Image(systemName: "checkmark.circle")
+                    .foregroundColor(.green)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(8)
+        .shadow(radius: 1)
     }
 }
 struct DurationGoalView: View {
