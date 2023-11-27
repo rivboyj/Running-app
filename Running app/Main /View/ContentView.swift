@@ -20,7 +20,7 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            HomeView(mainViewModel: mainViewModel)
+            HomeView(mainViewModel: mainViewModel, historyViewModel: historyViewModel)
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
@@ -38,7 +38,10 @@ struct ContentView: View {
 
 struct HomeView: View {
     @ObservedObject var mainViewModel: MainViewModel
+    @ObservedObject var historyViewModel: HistoryViewModel
     @State private var streak: Int = 0
+    @State private var showAlert = false
+    @State private var runToDelete: Run?
 
     var body: some View {
         NavigationView {
@@ -57,7 +60,7 @@ struct HomeView: View {
                 }
                 .padding(.top, 20)
 
-                NavigationLink(destination: AddRunView(mainViewModel: mainViewModel)) {
+                NavigationLink(destination: AddRunView(mainViewModel: mainViewModel, historyViewModel: historyViewModel)) {
                     Text("Add a Run")
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -74,26 +77,44 @@ struct HomeView: View {
                                 Text(run.goalName)
                                 Spacer()
                                 Button(action: {
-                                    if let index = mainViewModel.runArr.firstIndex(of: run) {
-                                        mainViewModel.runArr.remove(at: index)
-                                    }
+                                    self.runToDelete = run
+                                    self.showAlert = true
                                 }) {
                                     Image(systemName: "xmark.circle")
                                         .foregroundColor(.red)
                                 }
                             }
                         }
+                        .onDelete(perform: deleteRun)
                     }
                 }
+            }
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text("Delete Run"),
+                    message: Text("Are you sure you want to delete this run?"),
+                    primaryButton: .destructive(Text("Delete")) {
+                        if let run = self.runToDelete, let index = self.mainViewModel.runArr.firstIndex(of: run) {
+                            self.mainViewModel.runArr.remove(at: index)
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
             }
             .navigationBarTitle("Home", displayMode: .inline)
         }
     }
-}
 
+    private func deleteRun(at offsets: IndexSet) {
+        offsets.forEach { index in
+            mainViewModel.runArr.remove(at: index)
+        }
+    }
+}
 
 struct AddRunView: View {
     @ObservedObject var mainViewModel: MainViewModel
+    @ObservedObject var historyViewModel: HistoryViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var goalName: String = ""
@@ -115,7 +136,7 @@ struct AddRunView: View {
                     HStack {
                         Picker("Hours", selection: $hours) {
                             ForEach(0..<24, id: \.self) { hour in
-                                Text("\(hour) hr")
+                                Text("\(hour) hr").tag(hour)
                             }
                         }
                         .pickerStyle(WheelPickerStyle())
@@ -124,7 +145,7 @@ struct AddRunView: View {
 
                         Picker("Minutes", selection: $minutes) {
                             ForEach(0..<60, id: \.self) { minute in
-                                Text("\(minute) min")
+                                Text("\(minute) min").tag(minute)
                             }
                         }
                         .pickerStyle(WheelPickerStyle())
@@ -138,7 +159,7 @@ struct AddRunView: View {
                     HStack {
                         Picker("Miles", selection: $miles) {
                             ForEach(0..<101, id: \.self) { mile in
-                                Text("\(mile) mi")
+                                Text("\(mile) mi").tag(mile)
                             }
                         }
                         .pickerStyle(WheelPickerStyle())
@@ -147,7 +168,7 @@ struct AddRunView: View {
 
                         Picker("Fraction", selection: $fractionMiles) {
                             ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
-                                Text("\(frac, specifier: "%.1f") mi")
+                                Text("\(frac, specifier: "%.1f") mi").tag(frac)
                             }
                         }
                         .pickerStyle(WheelPickerStyle())
@@ -166,7 +187,13 @@ struct AddRunView: View {
                     duration: Time(hours: hours, minutes: minutes, seconds: 0),
                     date: runDate
                 )
-                mainViewModel.runArr.append(newRun)
+
+                if Calendar.current.isDateInToday(runDate) {
+                    mainViewModel.runArr.append(newRun)
+                } else {
+                    historyViewModel.addRun(newRun)
+                }
+
                 presentationMode.wrappedValue.dismiss()
             }
         }
