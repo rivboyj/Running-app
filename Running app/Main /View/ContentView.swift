@@ -36,9 +36,33 @@ struct ContentView: View {
     }
 }
 
+class RunColorViewModel: ObservableObject {
+    @Published var colorMap = [UUID: Color]()
+    private var currentColorIndex = 0
+    private let colors = [
+        Color(hex: "006d77"),
+        Color(hex: "83c5be"),
+        Color(hex: "edf6f9"),
+        Color(hex: "ffddd2"),
+        Color(hex: "e29578"),
+        Color(hex: "f0cf65")
+    ]
+
+    func color(for runId: UUID) -> Color {
+        if let color = colorMap[runId] {
+            return color
+        } else {
+            let selectedColor = colors[currentColorIndex % colors.count]
+            currentColorIndex += 1
+            colorMap[runId] = selectedColor
+            return selectedColor
+        }
+    }
+}
 struct HomeView: View {
     @ObservedObject var mainViewModel: MainViewModel
     @ObservedObject var historyViewModel: HistoryViewModel
+    @ObservedObject var runColorViewModel = RunColorViewModel()
     @State private var streak: Int = 0
     @State private var showAlert = false
     @State private var runToDelete: Run?
@@ -70,33 +94,48 @@ struct HomeView: View {
                 }
                 .padding()
 
-                List {
-                    Section(header: Text("Today's Runs")) {
+                Text("Today's Runs:")
+                    .font(.title2)
+                    .padding(.horizontal)
+
+                ScrollView {
+                    VStack(spacing: 10) { // This ensures there's space between each run entry
                         ForEach(mainViewModel.runArr.filter { Calendar.current.isDateInToday($0.date) }) { run in
-                            HStack {
+                            VStack(alignment: .leading, spacing: 4) { // Added spacing for internal VStack elements
                                 Text(run.goalName)
-                                Spacer()
-                                Button(action: {
-                                    self.runToDelete = run
-                                    self.showAlert = true
-                                }) {
-                                    Image(systemName: "xmark.circle")
-                                        .foregroundColor(.red)
+                                    .padding([.top, .horizontal])
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                if run.distanceInMiles > 0 {
+                                    Text("\(run.distanceInMiles, specifier: "%.2f") mi")
+                                        .padding(.horizontal)
+                                }
+
+                                if run.duration.hours > 0 || run.duration.minutes > 0 {
+                                    Text("\(run.duration.hours) hr \(run.duration.minutes) min")
+                                        .padding(.horizontal)
                                 }
                             }
+                            .padding(.vertical, 8) // Added padding for top and bottom
+                            .background(runColorViewModel.color(for: run.id))
+                            .cornerRadius(8)
                         }
-                        .onDelete(perform: deleteRun)
+                        .padding(.horizontal)
                     }
                 }
+                .background(Color(UIColor.systemGroupedBackground))
+                .padding(.bottom, 10) // Adds space at the bottom of the ScrollView
             }
             .alert(isPresented: $showAlert) {
                 Alert(
                     title: Text("Delete Run"),
                     message: Text("Are you sure you want to delete this run?"),
                     primaryButton: .destructive(Text("Delete")) {
-                        if let run = self.runToDelete, let index = self.mainViewModel.runArr.firstIndex(of: run) {
+                        if let runToDelete = self.runToDelete, let index = self.mainViewModel.runArr.firstIndex(of: runToDelete) {
                             self.mainViewModel.runArr.remove(at: index)
+                            self.runToDelete = nil // Reset the state after deletion
                         }
+                        self.showAlert = false // Dismiss the alert after the action
                     },
                     secondaryButton: .cancel()
                 )
@@ -104,13 +143,13 @@ struct HomeView: View {
             .navigationBarTitle("Home", displayMode: .inline)
         }
     }
-
     private func deleteRun(at offsets: IndexSet) {
         offsets.forEach { index in
             mainViewModel.runArr.remove(at: index)
         }
     }
 }
+
 
 struct AddRunView: View {
     @ObservedObject var mainViewModel: MainViewModel

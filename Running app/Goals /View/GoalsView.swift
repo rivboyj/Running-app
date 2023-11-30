@@ -13,9 +13,36 @@ enum ActiveAlert {
     case delete, complete, none
 }
 
+class GoalColorViewModel: ObservableObject {
+    @Published var colorMap = [String: Color]()
+    private var currentColorIndex = 0 // Maintain the current color index
+    private let colors = [
+        Color(hex: "006d77"),
+        Color(hex: "83c5be"),
+        Color(hex: "edf6f9"),
+        Color(hex: "ffddd2"),
+        Color(hex: "e29578"),
+        Color(hex: "f0cf65")
+    ]
+
+    func color(for goalId: String) -> Color {
+        if let color = colorMap[goalId] {
+            return color
+        } else {
+            let selectedColor = colors[currentColorIndex % colors.count] // Get the color based on the current index
+            currentColorIndex += 1 // Increment the current index for the next call
+            colorMap[goalId] = selectedColor
+            return selectedColor
+        }
+    }
+}
+
+// Main View
 struct GoalsView: View {
+    @ObservedObject var colorViewModel = GoalColorViewModel()
     @ObservedObject var viewModel = GoalViewModel()
     @ObservedObject var historyViewModel = HistoryViewModel()
+
     @State private var showAlert = false
     @State private var activeAlert: ActiveAlert = .none
     @State private var activeGoal: Goal?
@@ -23,18 +50,30 @@ struct GoalsView: View {
     var body: some View {
         NavigationView {
             VStack {
+                // Remove the background color from the ScrollView
                 ScrollView {
                     VStack {
-                        ForEach(viewModel.goalsArr) { goal in
-                            GoalRow(goal: goal, deleteAction: {
-                                self.activeGoal = goal
-                                self.activeAlert = .delete
-                                self.showAlert = true
-                            }, completeAction: {
-                                self.activeGoal = goal
-                                self.activeAlert = .complete
-                                self.showAlert = true
-                            })
+                        ForEach(viewModel.goalsArr.indices, id: \.self) { index in
+                            GoalRow(
+                                goal: viewModel.goalsArr[index],
+                                colorViewModel: colorViewModel,
+                                deleteAction: {
+                                    self.activeGoal = viewModel.goalsArr[index]
+                                    self.activeAlert = .delete
+                                    self.showAlert = true
+                                },
+                                completeAction: {
+                                    self.activeGoal = viewModel.goalsArr[index]
+                                    self.activeAlert = .complete
+                                    self.showAlert = true
+                                }
+                            )
+                            .padding(.horizontal)  // Adjust padding here
+                            .background(colorViewModel.color(for: viewModel.goalsArr[index].id.uuidString)) // Use the color from the colorViewModel
+                            .cornerRadius(8)
+                            .onTapGesture {
+                                // Handle row tap action if needed
+                            }
                         }
                     }
                 }
@@ -128,17 +167,20 @@ struct GoalsView: View {
         .padding(.vertical, 8)
     }
 }
-
+// GoalRow View
 struct GoalRow: View {
     let goal: Goal
+    @ObservedObject var colorViewModel: GoalColorViewModel
     let deleteAction: () -> Void
     let completeAction: () -> Void
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading) {
-                Text(goal.goalName).font(.headline)
-                HStack {
+            VStack(alignment: .leading, spacing: 4) { // Add spacing between elements
+                Text(goal.goalName)
+                    .font(.headline)
+                    .lineLimit(1) // Limit the text to one line
+                HStack(spacing: 8) { // Add spacing between elements
                     if goal.distanceInMiles > 0 {
                         Text("Distance: \(goal.distanceInMiles, specifier: "%.2f") miles")
                     }
@@ -161,10 +203,24 @@ struct GoalRow: View {
             }
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
-        .cornerRadius(8)
-        .shadow(radius: 1)
+        .frame(maxWidth: 350, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(colorViewModel.color(for: goal.id.uuidString)) // Use the color from the colorViewModel
+    }
+}
+// Extension for Color
+extension Color {
+    init(hex: String) {
+        let scanner = Scanner(string: hex)
+        scanner.currentIndex = hex.startIndex
+        var rgbValue: UInt64 = 0
+        scanner.scanHexInt64(&rgbValue)
+        
+        let r = Double((rgbValue & 0xff0000) >> 16) / 255.0
+        let g = Double((rgbValue & 0x00ff00) >> 8) / 255.0
+        let b = Double(rgbValue & 0x0000ff) / 255.0
+        
+        self.init(red: r, green: g, blue: b)
     }
 }
 struct DurationGoalView: View {
@@ -177,26 +233,30 @@ struct DurationGoalView: View {
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            HStack {
-                Picker("Hours", selection: $hours) {
-                    ForEach(0..<24, id: \.self) { hour in
-                        Text("\(hour) hour\(hour == 1 ? "" : "s")").tag(hour)
+            VStack {
+                Text("Time")
+                    .font(.headline)
+                HStack {
+                    Picker("Hours", selection: $hours) {
+                        ForEach(0..<24, id: \.self) { hour in
+                            Text("\(hour) hour\(hour == 1 ? "" : "s")").tag(hour)
+                        }
                     }
-                }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
-                Picker("Minutes", selection: $minutes) {
-                    ForEach(0..<60, id: \.self) { minute in
-                        Text("\(minute) min").tag(minute)
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
+                    Picker("Minutes", selection: $minutes) {
+                        ForEach(0..<60, id: \.self) { minute in
+                            Text("\(minute) min").tag(minute)
+                        }
                     }
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
                 }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
+                .compositingGroup()
+                .frame(height: 150)
             }
-            .compositingGroup()
-            .frame(height: 150)
             Button("Submit") {
                 let durationTime = Time(hours: hours, minutes: minutes, seconds: 0)
                 let goal = Goal(goalName: goalName, distanceInMiles: 0, pacePerMile: Time(hours: 0, minutes: 0, seconds: 0), duration: durationTime)
@@ -218,26 +278,30 @@ struct MileGoalView: View {
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            HStack {
-                Picker("Hours", selection: $paceHours) {
-                    ForEach(0..<24, id: \.self) { hour in
-                        Text("\(hour) hr").tag(hour)
+            VStack {
+                Text("Time")
+                    .font(.headline)
+                HStack {
+                    Picker("Hours", selection: $paceHours) {
+                        ForEach(0..<24, id: \.self) { hour in
+                            Text("\(hour) hr").tag(hour)
+                        }
                     }
-                }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
-                Picker("Minutes", selection: $paceMinutes) {
-                    ForEach(0..<60, id: \.self) { minute in
-                        Text("\(minute) min").tag(minute)
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
+                    Picker("Minutes", selection: $paceMinutes) {
+                        ForEach(0..<60, id: \.self) { minute in
+                            Text("\(minute) min").tag(minute)
+                        }
                     }
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
                 }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
+                .compositingGroup()
+                .frame(height: 150)
             }
-            .compositingGroup()
-            .frame(height: 150)
             Button("Submit") {
                 let pace = Time(hours: paceHours, minutes: paceMinutes, seconds: 0)
                 let goal = Goal(goalName: goalName, distanceInMiles: 0, pacePerMile: pace, duration: Time(hours: 0, minutes: 0, seconds: 0))
@@ -247,8 +311,6 @@ struct MileGoalView: View {
         }
     }
 }
-
-
 struct DistanceGoalView: View {
     @ObservedObject var viewModel: GoalViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -259,23 +321,27 @@ struct DistanceGoalView: View {
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            HStack {
-                Picker("Miles", selection: $miles) {
-                    ForEach(0..<101, id: \.self) { mile in
-                        Text("\(mile) mi").tag(mile)
+            VStack {
+                Text("Distance")
+                    .font(.headline)
+                HStack {
+                    Picker("Miles", selection: $miles) {
+                        ForEach(0..<101, id: \.self) { mile in
+                            Text("\(mile) mi").tag(mile)
+                        }
                     }
-                }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
-                Picker("Fraction", selection: $fraction) {
-                    ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
-                        Text("\(frac, specifier: "%.1f") mi").tag(frac)
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
+                    Picker("Fraction", selection: $fraction) {
+                        ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
+                            Text("\(frac, specifier: "%.1f") mi").tag(frac)
+                        }
                     }
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
                 }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
             }
             Button("Submit") {
                 let totalDistance = Double(miles) + fraction
@@ -300,41 +366,49 @@ struct SprintGoalView: View {
     var body: some View {
         Form {
             TextField("Goal Name", text: $goalName)
-            HStack {
-                Picker("Miles", selection: $miles) {
-                    ForEach(0..<101, id: \.self) { mile in
-                        Text("\(mile) mi").tag(mile)
+            VStack {
+                Text("Distance")
+                    .font(.headline)
+                HStack {
+                    Picker("Miles", selection: $miles) {
+                        ForEach(0..<101, id: \.self) { mile in
+                            Text("\(mile) mi").tag(mile)
+                        }
                     }
-                }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
-                Picker("Fraction", selection: $fraction) {
-                    ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
-                        Text("\(frac, specifier: "%.1f")").tag(frac)
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
+                    Picker("Fraction", selection: $fraction) {
+                        ForEach(Array(stride(from: 0.0, to: 1.0, by: 0.1)), id: \.self) { frac in
+                            Text("\(frac, specifier: "%.1f")").tag(frac)
+                        }
                     }
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
                 }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
             }
-            HStack {
-                Picker("Pace Hours", selection: $paceHours) {
-                    ForEach(0..<24, id: \.self) { hour in
-                        Text("\(hour) hr").tag(hour)
+            VStack {
+                Text("Pace")
+                    .font(.headline)
+                HStack {
+                    Picker("Pace Hours", selection: $paceHours) {
+                        ForEach(0..<24, id: \.self) { hour in
+                            Text("\(hour) hr").tag(hour)
+                        }
                     }
-                }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
-                Picker("Pace Minutes", selection: $paceMinutes) {
-                    ForEach(0..<60, id: \.self) { minute in
-                        Text("\(minute) min").tag(minute)
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
+                    Picker("Pace Minutes", selection: $paceMinutes) {
+                        ForEach(0..<60, id: \.self) { minute in
+                            Text("\(minute) min").tag(minute)
+                        }
                     }
+                    .pickerStyle(WheelPickerStyle())
+                    .frame(width: 100, height: 150)
+                    .clipped()
                 }
-                .pickerStyle(WheelPickerStyle())
-                .frame(width: 100, height: 150)
-                .clipped()
             }
             Button("Submit") {
                 let totalDistance = Double(miles) + fraction
