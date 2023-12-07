@@ -140,7 +140,7 @@ struct HomeView: View {
                     secondaryButton: .cancel()
                 )
             }
-            .navigationBarTitle("Home", displayMode: .inline)
+            .navigationBarTitle("", displayMode: .inline)
         }
     }
     private func deleteRun(at offsets: IndexSet) {
